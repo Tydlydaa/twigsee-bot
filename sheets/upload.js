@@ -12,7 +12,7 @@ async function uploadToSheet() {
 
   const client = await auth.getClient();
   const sheets = google.sheets({ version: 'v4', auth: client });
-  const spreadsheetId = 'YOUR_SPREADSHEET_ID';
+  const spreadsheetId = '161OmOKLIaz4GHER5u8TPPDQB4yV0eX0R72EM-sQBhQA';
 
   const today = dayjs().format('DD.MM.YYYY');
   const filePath = './bot/downloads/dochazka_' + today + '.xls';
