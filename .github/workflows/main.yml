@@ -1,0 +1,34 @@
+name: Daily Twigsee Export
+
+on:
+  schedule:
+    - cron: '0 6 * * *'  # Runs every day at 6:00 UTC
+  workflow_dispatch:
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v3
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+
+    - name: Install dependencies
+      run: npm install puppeteer xlsx googleapis dayjs
+
+    - name: Run bot
+      run: node bot/index.js
+      env:
+        TWIGSEE_EMAIL: ${{ secrets.TWIGSEE_EMAIL }}
+        TWIGSEE_PASSWORD: ${{ secrets.TWIGSEE_PASSWORD }}
+        SCHOOL_NAME: ${{ secrets.SCHOOL_NAME }}
+
+    - name: Upload to Google Sheets
+      run: node sheets/upload.js
+      env:
+        GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
