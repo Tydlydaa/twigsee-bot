@@ -19,9 +19,9 @@ const dayjs = require('dayjs');
   await page.type('input[name="email"]', email);
   await page.type('input[name="password"]', password);
   await Promise.all([
-    page.waitForNavigation(),
-    page.click('button[type="submit"]')
-  ]);
+  page.waitForNavigation({ waitUntil: 'networkidle0' }),
+  page.click('button:has-text("Přihlásit se")')
+]);
 
   await page.waitForSelector('select[name="sch__id"]');
   await page.select('select[name="sch__id"]', schoolName); // may need logic here
