@@ -1,4 +1,4 @@
-name: Daily Twigsee Export 2.0
+name: Daily Twigsee Export 
  
 on:
   schedule:
