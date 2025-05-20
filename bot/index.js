@@ -18,9 +18,11 @@ const dayjs = require('dayjs');
   await page.goto('https://admin.twigsee.com');
   await page.type('input[name="email"]', email);
   await page.type('input[name="password"]', password);
-  await Promise.all([
+  
+  await page.waitForSelector('input#submit');
+await Promise.all([
   page.waitForNavigation({ waitUntil: 'networkidle0' }),
-  page.click('button:has-text("Přihlásit se")')
+  page.click('input#submit')
 ]);
 
   await page.waitForSelector('select[name="sch__id"]');
