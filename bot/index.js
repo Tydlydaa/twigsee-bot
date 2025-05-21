@@ -4,7 +4,7 @@ const path = require('path');
 const XLSX = require('xlsx');
 const { google } = require('googleapis');
 const dayjs = require('dayjs');
-
+console.log('GOOGLE_CREDENTIALS_JSON exists?', !!process.env.GOOGLE_CREDENTIALS_JSON);
 const credentials = JSON.parse(Buffer.from(process.env.GOOGLE_CREDENTIALS_JSON, 'base64').toString('utf8'));
 const auth = new google.auth.JWT(
   credentials.client_email,
