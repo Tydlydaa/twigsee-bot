@@ -80,20 +80,10 @@ const dayjs = require('dayjs');
   console.log("Klikám na tlačítko Export...");
   await page.waitForSelector('a.btn-export');
 
-  const [downloadedFile] = await Promise.all([
-    new Promise(resolve => {
-      const before = new Set(fs.readdirSync(downloadPath));
-      const check = setInterval(() => {
-        const after = new Set(fs.readdirSync(downloadPath));
-        const diff = [...after].filter(x => !before.has(x) && x.endsWith('.xls'));
-        if (diff.length > 0) {
-          clearInterval(check);
-          resolve(diff[0]);
-        }
-      }, 500);
-    }),
-    page.click('a.btn-export')
-  ]);
+ await page.click('a.btn-export');
+await new Promise(resolve => setTimeout(resolve, 3000));
+await page.screenshot({ path: 'after-export-click.png' });
+console.log("Kliknutí na Export provedeno, čekal jsem 3 sekundy.");
 
   console.log(`Soubor exportován: ${path.join(downloadPath, downloadedFile)}`);
 
