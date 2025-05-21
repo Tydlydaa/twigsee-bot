@@ -1,81 +1,119 @@
-// bot/index.js (Puppeteer skript pro víc školek)
-const puppeteer = require('puppeteer');
+// sheets/upload.js
 const fs = require('fs');
 const path = require('path');
+const XLSX = require('xlsx');
+const { google } = require('googleapis');
 const dayjs = require('dayjs');
 
+const credentials = JSON.parse(Buffer.from(process.env.GOOGLE_CREDENTIALS_JSON, 'base64').toString('utf8'));
+const auth = new google.auth.JWT(
+  credentials.client_email,
+  null,
+  credentials.private_key,
+  ['https://www.googleapis.com/auth/spreadsheets']
+);
+
+const sheets = google.sheets({ version: 'v4', auth });
+const SPREADSHEET_ID = 'TVUJ_GOOGLE_SHEET_ID'; // TODO: replace manually or use env
+
+const downloadDir = path.resolve(__dirname, '../bot/downloads');
+const files = fs.readdirSync(downloadDir).filter(f => f.endsWith('.xls'));
+
+const cleanName = (fullName) => {
+  return fullName.replace(/^(Dětská skupina|Lesní mateřská škola)\s+/, '').trim();
+};
+
+const getSheet = async (name) => {
+  try {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: SPREADSHEET_ID,
+      requestBody: {
+        requests: [{ addSheet: { properties: { title: name } } }],
+      },
+    });
+    console.log(`🆕 Vytvořen sheet: ${name}`);
+  } catch (e) {
+    if (!e.message.includes('already exists')) console.error(e);
+  }
+};
+
+const appendToSheet = async (sheetName, rows) => {
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: SPREADSHEET_ID,
+    range: `${sheetName}!A1`,
+    valueInputOption: 'RAW',
+    insertDataOption: 'INSERT_ROWS',
+    requestBody: { values: rows },
+  });
+};
+
+const upsertStatRow = async (headers, row) => {
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId: SPREADSHEET_ID,
+    range: 'Statistiky!A1:Z1000',
+  });
+  const rows = response.data.values || [];
+  const [headerRow, ...dataRows] = rows;
+
+  const keyIndex = headerRow.slice(0, 2); // ['Datum', 'Školka']
+  const rowKey = row.slice(0, 2).join('||');
+  const existingIndex = dataRows.findIndex(r => r.slice(0, 2).join('||') === rowKey);
+
+  const allHeaders = Array.from(new Set([...headerRow, ...headers]));
+  const newRow = new Array(allHeaders.length).fill('');
+  for (let i = 0; i < allHeaders.length; i++) {
+    const header = allHeaders[i];
+    const indexInNew = headers.indexOf(header);
+    if (indexInNew >= 0) newRow[i] = row[indexInNew];
+  }
+
+  const updateValues = [allHeaders, ...dataRows];
+  if (existingIndex >= 0) {
+    updateValues[existingIndex + 1] = newRow;
+  } else {
+    updateValues.push(newRow);
+  }
+
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: SPREADSHEET_ID,
+    range: `Statistiky!A1`,
+    valueInputOption: 'RAW',
+    requestBody: { values: updateValues },
+  });
+};
+
 (async () => {
-  const email = process.env.TWIGSEE_EMAIL;
-  const password = process.env.TWIGSEE_PASSWORD;
-  const downloadPath = path.resolve(__dirname, 'downloads');
-  const date = dayjs().subtract(1, 'day').format('DD.MM.YYYY');
-  const dateLabel = dayjs().subtract(1, 'day').format('YYYY-MM-DD');
+  await getSheet('Statistiky');
 
-  if (!fs.existsSync(downloadPath)) fs.mkdirSync(downloadPath);
+  for (const file of files) {
+    const workbook = XLSX.readFile(path.join(downloadDir, file));
+    const sheetName = workbook.SheetNames[0];
+    const data = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1 });
 
-  const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox'] });
-  const page = await browser.newPage();
+    const match = file.match(/^dochazka_(\d{4}-\d{2}-\d{2})_(.+)\.xls$/);
+    if (!match) continue;
+    const [_, date, fullNameRaw] = match;
+    const fullName = fullNameRaw.replace(/_/g, ' ');
+    const sheetTab = cleanName(fullName);
 
-  console.log("Logging in...");
-  await page.goto('https://admin.twigsee.com');
-  await page.type('input[name="email"]', email);
-  await page.type('input[name="password"]', password);
-  await Promise.all([
-    page.waitForNavigation({ waitUntil: 'networkidle0' }),
-    page.click('input[type="submit"]')
-  ]);
+    const output = data.slice(1).map(row => [date, ...row]);
+    const header = ["Datum", ...(data[0] || [])];
 
-  await page.goto('https://admin.twigsee.com/user-admin/choice-school');
-  await page.waitForSelector('.select2-selection');
-  await page.click('.select2-selection');
-  await page.waitForSelector('.select2-results__option');
+    await getSheet(sheetTab);
+    await appendToSheet(sheetTab, [header, ...output]);
+    console.log(`✔ Data z ${file} nahrána do listu ${sheetTab}`);
 
-  const options = await page.$$('.select2-results__option');
-  const ignored = ['Vyberte', 'Choose', 'Select', 'Zvolte'];
-  const schoolNames = [];
-  for (const option of options) {
-    const text = await option.evaluate(el => el.textContent.trim());
-    if (text && !ignored.includes(text)) schoolNames.push(text);
-  }
-  console.log('Zjištěné školky:', schoolNames);
-
-  for (const schoolName of schoolNames) {
-    console.log(`Zpracovávám školku: ${schoolName}`);
-
-    try {
-      await page.goto('https://admin.twigsee.com/user-admin/choice-school');
-      await page.waitForSelector('.select2-selection');
-      await page.click('.select2-selection');
-      await page.waitForSelector('.select2-results__option');
-
-      const options = await page.$$('.select2-results__option');
-      for (const option of options) {
-        const text = await option.evaluate(el => el.textContent.trim());
-        if (text === schoolName) {
-          await option.click();
-          break;
-        }
-      }
-
-      await page.waitForNavigation({ waitUntil: 'networkidle0' });
-      await page.goto('https://admin.twigsee.com/child-attendance/list');
-      await page.waitForSelector('a.btn-export');
-      const href = await page.$eval('a.btn-export', el => el.getAttribute('href'));
-      const exportUrl = `https://admin.twigsee.com${href}?chiatt__date=${date}`;
-
-      const buffer = await page.evaluate(async (url) => {
-        const res = await fetch(url, { credentials: 'include' });
-        const arrayBuffer = await res.arrayBuffer();
-        return Array.from(new Uint8Array(arrayBuffer));
-      }, exportUrl);
-
-      const fileName = `dochazka_${dateLabel}_${schoolName.replace(/\s+/g, '_')}.xls`;
-      fs.writeFileSync(path.join(downloadPath, fileName), Buffer.from(buffer));
-      console.log(`✔ Staženo: ${fileName}`);
-    } catch (err) {
-      console.error(`⛔ Chyba při zpracování školky ${schoolName}:`, err.message);
+    const statusIndex = header.indexOf("Status");
+    const counts = {};
+    for (const row of output) {
+      const status = row[statusIndex];
+      if (!counts[status]) counts[status] = 0;
+      counts[status]++;
     }
-  }
 
-  await browser.close();
+    const statHeaders = ["Datum", "Školka", ...Object.keys(counts)];
+    const statRow = [date, sheetTab, ...Object.values(counts)];
+    await upsertStatRow(statHeaders, statRow);
+    console.log(`📊 Statistiky pro ${sheetTab} (${date}) zapsány.`);
+  }
 })();
