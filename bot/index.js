@@ -23,7 +23,7 @@ const dayjs = require('dayjs');
 
   console.log("Otevírám přihlašovací stránku...");
   await page.goto('https://admin.twigsee.com');
-  await page.waitForTimeout(1000); // malá pauza na načtení skriptů
+  await new Promise(resolve => setTimeout(resolve, 1000)); // pauza 1s na načtení skriptů
 
   console.log("Vyplňuji přihlašovací údaje...");
   await page.type('input[name="email"]', email);
