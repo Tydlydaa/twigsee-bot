@@ -47,12 +47,16 @@ const dayjs = require('dayjs');
   ]);
   console.log("Přihlášení proběhlo.");
 
-  // TESTOVACÍ BLOK: jen jedna školka a dva dny
-  const testSchool = "Dětská skupina Nusličky";
-  const testDates = [
-    dayjs('2025-05-20'),
-    dayjs('2025-05-21')
-  ];
+  const testSchool = "Dětská skupina Školička Keltičkova";
+
+  // 🗓️ Vygeneruj pracovní dny v květnu 2025
+  const testDates = [];
+  for (let d = dayjs('2025-05-01'); d.isBefore('2025-06-01'); d = d.add(1, 'day')) {
+    const day = d.day(); // 0 = neděle, 6 = sobota
+    if (day !== 0 && day !== 6) {
+      testDates.push(d);
+    }
+  }
 
   for (const targetDate of testDates) {
     const date = targetDate.format('DD.MM.YYYY');
