@@ -9,7 +9,6 @@ const dayjs = require('dayjs');
 
   const email = process.env.TWIGSEE_EMAIL;
   const password = process.env.TWIGSEE_PASSWORD;
-  const schoolName = process.env.SCHOOL_NAME;
   const downloadPath = path.resolve(__dirname, 'downloads');
 
   if (!fs.existsSync(downloadPath)) {
@@ -17,10 +16,9 @@ const dayjs = require('dayjs');
     fs.mkdirSync(downloadPath, { recursive: true });
   }
 
-  const yesterday = dayjs().subtract(1, 'day').format('DD.MM.YYYY');
-  const fileDate = dayjs().subtract(1, 'day').format('YYYY-MM-DD');
+  const date = dayjs().subtract(1, 'day').format('DD.MM.YYYY');
+  const dateLabel = dayjs().subtract(1, 'day').format('YYYY-MM-DD');
 
-  console.log("Spouštím prohlížeč...");
   const browser = await puppeteer.launch({
     headless: true,
     args: ['--no-sandbox'],
@@ -35,10 +33,10 @@ const dayjs = require('dayjs');
     downloadPath: downloadPath,
   });
 
-  console.log("Otevírám přihlašovací stránku...");
+  console.log("Spouštím prohlížeč...");
   await page.goto('https://admin.twigsee.com');
   await new Promise(resolve => setTimeout(resolve, 1000));
-  
+
   console.log("Vyplňuji přihlašovací údaje...");
   await page.type('input[name="email"]', email);
   await page.type('input[name="password"]', password);
@@ -53,48 +51,56 @@ const dayjs = require('dayjs');
   console.log("Přihlášení proběhlo.");
 
   await page.goto('https://admin.twigsee.com/user-admin/choice-school');
-
   await page.waitForSelector('.select2-selection');
   await page.click('.select2-selection');
   await page.waitForSelector('.select2-results__option');
 
   const schoolNames = await page.$$eval('.select2-results__option', options =>
-  options
-    .map(opt => opt.textContent.trim())
-    .filter(name => name && !/^vyberte|choose$/i.test(name))
-);
+    options
+      .map(opt => opt.textContent.trim())
+      .filter(name => name && !/^vyberte|choose$/i.test(name))
+  );
 
   console.log("Zjištěné školky:", schoolNames);
 
-  for (const fullName of schoolNames) {
-    console.log(`Zpracovávám školku: ${fullName}`);
-    await page.goto('https://admin.twigsee.com/user-admin/choice-school');
-    await page.waitForSelector('.select2-selection');
-    await page.click('.select2-selection');
-    await page.waitForSelector('.select2-results__option');
+  for (const schoolName of schoolNames) {
+    console.log(`Zpracovávám školku: ${schoolName}`);
+    try {
+      await page.goto('https://admin.twigsee.com/user-admin/choice-school');
+      await page.waitForSelector('.select2-selection');
+      await page.click('.select2-selection');
+      await page.waitForSelector('.select2-results__option');
 
-    const options = await page.$$('.select2-results__option');
-    for (const option of options) {
-      const text = await option.evaluate(el => el.textContent.trim());
-      if (text === fullName) {
-        await option.click();
-        break;
+      const options = await page.$$('.select2-results__option');
+      for (const option of options) {
+        const text = await option.evaluate(el => el.textContent.trim());
+        if (text === schoolName) {
+          await option.click();
+          break;
+        }
       }
+
+      await page.waitForNavigation({ waitUntil: 'networkidle0' });
+      await page.goto('https://admin.twigsee.com/child-attendance/list');
+      await page.waitForSelector('a.btn-export');
+
+      const href = await page.$eval('a.btn-export', el => el.getAttribute('href'));
+      const exportUrl = `https://admin.twigsee.com${href}?chiatt__date=${date}`;
+
+      const buffer = await page.evaluate(async (url) => {
+        const res = await fetch(url, { credentials: 'include' });
+        const arrayBuffer = await res.arrayBuffer();
+        return Array.from(new Uint8Array(arrayBuffer));
+      }, exportUrl);
+
+      const fileName = `dochazka_${dateLabel}_${schoolName.replace(/\s+/g, '_')}.xls`;
+      fs.writeFileSync(path.join(downloadPath, fileName), Buffer.from(buffer));
+      console.log(`✔ Staženo: ${fileName}`);
+    } catch (err) {
+      console.error(`⛔ Chyba při zpracování školky ${schoolName}:`, err.message);
     }
-
-    await page.waitForNavigation({ waitUntil: 'networkidle0' });
-    await page.goto('https://admin.twigsee.com/child-attendance/list');
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    const href = await page.$eval('a.btn-export', el => el.getAttribute('href'));
-    const exportUrl = `https://admin.twigsee.com${href}`;
-    const filePath = path.join(downloadPath, `dochazka_${fileDate}_${fullName.replace(/\s+/g, '_')}.xls`);
-
-    const viewSource = await page.goto(exportUrl);
-    fs.writeFileSync(filePath, await viewSource.buffer());
-    console.log(`✔ Staženo: ${path.basename(filePath)}`);
   }
 
   await browser.close();
-  console.log("Hotovo. Prohlížeč zavřen.");
+  console.log("✅ Hotovo. Prohlížeč zavřen.");
 })();
