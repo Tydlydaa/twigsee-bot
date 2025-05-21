@@ -78,10 +78,18 @@ const dayjs = require('dayjs');
   await page.screenshot({ path: 'export-screen.png' });
 
   console.log("Klikám na tlačítko Export...");
-  await page.waitForSelector('a.btn-export');
+console.log("Hledám odkaz ke stažení exportu...");
+await page.waitForSelector('a.btn-export');
 
- await page.click('a.btn-export');
-await new Promise(resolve => setTimeout(resolve, 3000));
+const exportHref = await page.$eval('a.btn-export', el => el.getAttribute('href'));
+const exportUrl = `https://admin.twigsee.com${exportHref}`;
+console.log(`Načten export URL: ${exportUrl}`);
+
+const viewSource = await page.goto(exportUrl);
+const filePath = path.join(downloadPath, `dochazka_${today}.xls`);
+fs.writeFileSync(filePath, await viewSource.buffer());
+console.log(`Soubor uložen: ${filePath}`);
+  
 await page.screenshot({ path: 'after-export-click.png' });
 console.log("Kliknutí na Export provedeno, čekal jsem 3 sekundy.");
 
