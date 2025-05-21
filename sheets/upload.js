@@ -63,7 +63,8 @@ const upsertStatRow = async (headers, row) => {
     range: 'Statistiky!A1:Z1000',
   });
   const rows = response.data.values || [];
-  const [headerRow, ...dataRows] = rows;
+  const headerRow = rows.length > 0 ? rows[0] : [];
+  const dataRows = rows.length > 1 ? rows.slice(1) : [];
 
   const rowKey = row.slice(0, 2).join('||');
   const existingIndex = dataRows.findIndex(r => r.slice(0, 2).join('||') === rowKey);
