@@ -3,11 +3,11 @@
 Tento repozitář obsahuje automatického bota, který:
 
 📅 se každý den přihlásí do platformy [Twigsee](https://admin.twigsee.com)
-📆 vybere zvolené zařízení (školku)
-📆 stáhne docházku za dnešní den jako `.xls`
-📆 a uloží ji do Google Sheets
+📆 postupně vybere všechny školky z přehledu
+📆 stáhne docházku za **předchozí den** jako `.xls`
+📆 a uloží ji do Google Sheets, každou školku zvlášť do jejího listu
 
-Plně automatizováno přes **GitHub Actions** (každý den v 6:00 UTC).
+Plně automatizováno přes **GitHub Actions** (každý den v 8:00 UTC+1).
 
 ---
 
@@ -52,12 +52,11 @@ base64 -i credentials.json | pbcopy   # macOS
 
 ### 3. GitHub Secrets (repo → Settings → Secrets → Actions)
 
-| Název                     | Popis                                            |
-| ------------------------- | ------------------------------------------------ |
-| `TWIGSEE_EMAIL`           | Přihlašovací e-mail do Twigsee                   |
-| `TWIGSEE_PASSWORD`        | Heslo do Twigsee                                 |
-| `SCHOOL_NAME`             | Název školky (např. `Dětská skupina Mezi květy`) |
-| `GOOGLE_CREDENTIALS_JSON` | base64 zakódovaný obsah `credentials.json`       |
+| Název                     | Popis                                      |
+| ------------------------- | ------------------------------------------ |
+| `TWIGSEE_EMAIL`           | Přihlašovací e-mail do Twigsee             |
+| `TWIGSEE_PASSWORD`        | Heslo do Twigsee                           |
+| `GOOGLE_CREDENTIALS_JSON` | base64 zakódovaný obsah `credentials.json` |
 
 ---
 
@@ -83,23 +82,29 @@ twigsee-bot/
 2. Puppeteer:
 
    * přihlásí se do Twigsee
-   * vybere školku pomocí Select2 dropdownu
-   * přejde na stránku s docházkou
-   * klikne na tlačítko Export
-   * vytáhne URL odkazu
-   * stáhne `.xls` přes `fetch()` přímo z prohlížeče
-3. Soubor se uloží do `bot/downloads/dochazka_<datum>.xls`
-4. Skript `sheets/upload.js`:
+   * zjistí seznam všech dostupných skolek z dropdownu
+   * pro každou školku:
 
-   * načte poslední `.xls`
-   * doplní datum ke každému řádku
-   * přidá data jako nové řádky do Google Sheet
+     * vybere ji
+     * přejde na stránku docházky
+     * klikne na tlačítko Export
+     * stáhne `.xls` soubor přes `fetch()`
+     * uloží jako `dochazka_<datum>_<nazev>.xls`
+3. Skript `sheets/upload.js`:
+
+   * pro každý stažený soubor:
+
+     * zjistí název školky
+     * odstraní prefix "Dětská skupina" nebo "Lesní mateřská škola"
+     * v Google Sheet vytvoří / doplní list s daným názvem
+     * přidá řádky za daný den do konce listu (bez mazání starých dat)
+     * doplní do sloupce `A` název sloupce `Datum` a pak datum exportovaných údajů
 
 ---
 
 ## 🕒 Automatické spouštění
 
-Workflow se spouští každý den v **6:00 UTC** (tedy 7:00 nebo 8:00 ráno SEČ dle letního času).
+Workflow se spouští každý den v **8:00 ráno (UTC+1)** a stahuje data za **předchozí den**.
 
 ---
 
