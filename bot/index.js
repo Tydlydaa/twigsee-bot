@@ -21,7 +21,7 @@ const dayjs = require('dayjs');
 
   const page = await browser.newPage();
 
-  // 🧩 Nastavení složky pro stahování
+  // 🧩 Nastavení složky pro stahování (zatím ponecháme, pro budoucnost)
   const client = await page.target().createCDPSession();
   await client.send('Page.setDownloadBehavior', {
     behavior: 'allow',
@@ -77,23 +77,27 @@ const dayjs = require('dayjs');
   // 📸 Screenshot pro ladění
   await page.screenshot({ path: 'export-screen.png' });
 
-  console.log("Klikám na tlačítko Export...");
-console.log("Hledám odkaz ke stažení exportu...");
-await page.waitForSelector('a.btn-export');
+  console.log("Hledám odkaz ke stažení exportu...");
+  await page.waitForSelector('a.btn-export');
 
-const exportHref = await page.$eval('a.btn-export', el => el.getAttribute('href'));
-const exportUrl = `https://admin.twigsee.com${exportHref}`;
-console.log(`Načten export URL: ${exportUrl}`);
+  const exportHref = await page.$eval('a.btn-export', el => el.getAttribute('href'));
+  const exportUrl = `https://admin.twigsee.com${exportHref}`;
+  console.log(`Načten export URL: ${exportUrl}`);
 
-const viewSource = await page.goto(exportUrl);
-const filePath = path.join(downloadPath, `dochazka_${today}.xls`);
-fs.writeFileSync(filePath, await viewSource.buffer());
-console.log(`Soubor uložen: ${filePath}`);
-  
-await page.screenshot({ path: 'after-export-click.png' });
-console.log("Kliknutí na Export provedeno, čekal jsem 3 sekundy.");
+  const filePath = path.join(downloadPath, `dochazka_${today}.xls`);
+  console.log(`Stahuji soubor pomocí fetch z URL: ${exportUrl}...`);
 
- // console.log(`Soubor exportován: ${path.join(downloadPath, downloadedFile)}`);
+  const buffer = await page.evaluate(async (url) => {
+    const res = await fetch(url, { credentials: 'include' });
+    if (!res.ok) throw new Error(`Fetch selhal: ${res.statusText}`);
+    const arrayBuffer = await res.arrayBuffer();
+    return Array.from(new Uint8Array(arrayBuffer));
+  }, exportUrl);
+
+  fs.writeFileSync(filePath, Buffer.from(buffer));
+  console.log(`Soubor uložen: ${filePath}`);
+
+  await page.screenshot({ path: 'after-export-click.png' });
 
   await browser.close();
   console.log("Hotovo. Prohlížeč zavřen.");
