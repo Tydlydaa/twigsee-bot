@@ -14,7 +14,7 @@ const auth = new google.auth.JWT(
 );
 
 const sheets = google.sheets({ version: 'v4', auth });
-const SPREADSHEET_ID = 'TVUJ_GOOGLE_SHEET_ID'; // TODO: replace manually or use env
+const SPREADSHEET_ID = process.env.SPREADSHEET_ID;
 
 const downloadDir = path.resolve(__dirname, '../bot/downloads');
 
