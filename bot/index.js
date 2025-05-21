@@ -31,11 +31,14 @@ const dayjs = require('dayjs');
   await page.waitForSelector('.select2-results__option');
 
   const options = await page.$$('.select2-results__option');
+  const ignored = ['Vyberte', 'Choose', 'Select', 'Zvolte'];
   const schoolNames = [];
   for (const option of options) {
     const text = await option.evaluate(el => el.textContent.trim());
-    if (text && text !== 'Vyberte') schoolNames.push(text);
+    if (text && !ignored.includes(text)) schoolNames.push(text);
   }
+
+  console.log('Zjištěné školky:', schoolNames);
 
   for (const schoolName of schoolNames) {
     console.log(`Zpracovávám školku: ${schoolName}`);
