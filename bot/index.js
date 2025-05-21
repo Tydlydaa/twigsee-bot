@@ -59,8 +59,10 @@ const dayjs = require('dayjs');
   await page.waitForSelector('.select2-results__option');
 
   const schoolNames = await page.$$eval('.select2-results__option', options =>
-    options.map(opt => opt.textContent.trim()).filter(name => name && name !== 'Vyberte')
-  );
+  options
+    .map(opt => opt.textContent.trim())
+    .filter(name => name && !/^vyberte|choose$/i.test(name))
+);
 
   console.log("Zjištěné školky:", schoolNames);
 
