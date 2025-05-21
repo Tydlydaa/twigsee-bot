@@ -21,9 +21,16 @@ const dayjs = require('dayjs');
 
   const page = await browser.newPage();
 
+  // 🧩 Nastavení složky pro stahování
+  const client = await page.target().createCDPSession();
+  await client.send('Page.setDownloadBehavior', {
+    behavior: 'allow',
+    downloadPath: downloadPath,
+  });
+
   console.log("Otevírám přihlašovací stránku...");
   await page.goto('https://admin.twigsee.com');
-  await new Promise(resolve => setTimeout(resolve, 1000)); // pauza 1s na načtení skriptů
+  await new Promise(resolve => setTimeout(resolve, 1000));
 
   console.log("Vyplňuji přihlašovací údaje...");
   await page.type('input[name="email"]', email);
@@ -37,17 +44,13 @@ const dayjs = require('dayjs');
     page.click('input[type="submit"]')
   ]);
   console.log("Přihlášení proběhlo.");
-  // Volitelně: přidej krátkou pauzu
-  await new Promise(resolve => setTimeout(resolve, 1000));
 
-  // Jistota – rovnou přejdi na stránku s výběrem školky
+  await new Promise(resolve => setTimeout(resolve, 1000));
   await page.goto('https://admin.twigsee.com/user-admin/choice-school');
-  
-  console.log("Čekám na výběr školky...");
 
   console.log("Vyhledávám výběr školky...");
   await page.waitForSelector('.select2-selection');
-  await page.click('.select2-selection'); // otevře select2 dropdown
+  await page.click('.select2-selection');
 
   console.log("Čekám na otevření dropdownu...");
   await page.waitForSelector('.select2-results__option');
@@ -64,23 +67,35 @@ const dayjs = require('dayjs');
   }
 
   console.log("Školka vybrána.");
-
-  
   console.log(`Vybral jsem školku: ${schoolName}`);
 
   await page.waitForNavigation({ waitUntil: 'networkidle0' });
   console.log("Přepínám na stránku s docházkou...");
   await page.goto('https://admin.twigsee.com/child-attendance/list');
+  await new Promise(resolve => setTimeout(resolve, 2000));
 
-  const exportUrl = `https://admin.twigsee.com/child-attendance/export/ajax/1?chiatt__date=${today}`;
-  const downloadTarget = path.join(downloadPath, `dochazka_${today}.xls`);
+  // 📸 Screenshot pro ladění
+  await page.screenshot({ path: 'export-screen.png' });
 
-  console.log(`Stahuji exportovaný soubor z: ${exportUrl}`);
- console.log("Stahuji exportovaný soubor (přes aktuální relaci)...");
-const viewSource = await page.goto(exportUrl);
-fs.writeFileSync(downloadTarget, await viewSource.buffer());
+  console.log("Klikám na tlačítko Export...");
+  await page.waitForSelector('a.btn-export');
 
-  console.log(`Soubor uložen: ${downloadTarget}`);
+  const [downloadedFile] = await Promise.all([
+    new Promise(resolve => {
+      const before = new Set(fs.readdirSync(downloadPath));
+      const check = setInterval(() => {
+        const after = new Set(fs.readdirSync(downloadPath));
+        const diff = [...after].filter(x => !before.has(x) && x.endsWith('.xls'));
+        if (diff.length > 0) {
+          clearInterval(check);
+          resolve(diff[0]);
+        }
+      }, 500);
+    }),
+    page.click('a.btn-export')
+  ]);
+
+  console.log(`Soubor exportován: ${path.join(downloadPath, downloadedFile)}`);
 
   await browser.close();
   console.log("Hotovo. Prohlížeč zavřen.");
