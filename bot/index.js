@@ -37,10 +37,35 @@ const dayjs = require('dayjs');
     page.click('input[type="submit"]')
   ]);
   console.log("Přihlášení proběhlo.");
+  // Volitelně: přidej krátkou pauzu
+  await new Promise(resolve => setTimeout(resolve, 1000));
 
+  // Jistota – rovnou přejdi na stránku s výběrem školky
+  await page.goto('https://admin.twigsee.com/user-admin/choice-school');
+  
   console.log("Čekám na výběr školky...");
-  await page.waitForSelector('select[name="sch__id"]');
-  await page.select('select[name="sch__id"]', schoolName);
+
+  console.log("Vyhledávám výběr školky...");
+  await page.waitForSelector('.select2-selection');
+  await page.click('.select2-selection'); // otevře select2 dropdown
+
+  console.log("Čekám na otevření dropdownu...");
+  await page.waitForSelector('.select2-results__option');
+
+  console.log("Hledám školku v seznamu...");
+  const options = await page.$$('.select2-results__option');
+  for (const option of options) {
+    const text = await option.evaluate(el => el.textContent.trim());
+    if (text.includes(schoolName)) {
+      console.log(`Klikám na: ${text}`);
+      await option.click();
+      break;
+    }
+  }
+
+  console.log("Školka vybrána.");
+
+  
   console.log(`Vybral jsem školku: ${schoolName}`);
 
   await page.waitForNavigation({ waitUntil: 'networkidle0' });
