@@ -16,9 +16,6 @@ const dayjs = require('dayjs');
     fs.mkdirSync(downloadPath, { recursive: true });
   }
 
-  const date = dayjs().subtract(1, 'day').format('DD.MM.YYYY');
-  const dateLabel = dayjs().subtract(1, 'day').format('YYYY-MM-DD');
-
   const browser = await puppeteer.launch({
     headless: true,
     args: ['--no-sandbox'],
@@ -50,21 +47,20 @@ const dayjs = require('dayjs');
   ]);
   console.log("Přihlášení proběhlo.");
 
-  await page.goto('https://admin.twigsee.com/user-admin/choice-school');
-  await page.waitForSelector('.select2-selection');
-  await page.click('.select2-selection');
-  await page.waitForSelector('.select2-results__option');
+  // TESTOVACÍ BLOK: jen jedna školka a dva dny
+  const testSchool = "Dětská skupina Nusličky";
+  const testDates = [
+    dayjs('2025-05-20'),
+    dayjs('2025-05-21')
+  ];
 
-  const schoolNames = await page.$$eval('.select2-results__option', options =>
-    options
-      .map(opt => opt.textContent.trim())
-      .filter(name => name && !/^vyberte|choose$/i.test(name))
-  );
+  for (const targetDate of testDates) {
+    const date = targetDate.format('DD.MM.YYYY');
+    const dateLabel = targetDate.format('YYYY-MM-DD');
+    const schoolName = testSchool;
 
-  console.log("Zjištěné školky:", schoolNames);
+    console.log(`Zpracovávám školku: ${schoolName} pro datum: ${date}`);
 
-  for (const schoolName of schoolNames) {
-    console.log(`Zpracovávám školku: ${schoolName}`);
     try {
       await page.goto('https://admin.twigsee.com/user-admin/choice-school');
       await page.waitForSelector('.select2-selection');
@@ -97,7 +93,7 @@ const dayjs = require('dayjs');
       fs.writeFileSync(path.join(downloadPath, fileName), Buffer.from(buffer));
       console.log(`✔ Staženo: ${fileName}`);
     } catch (err) {
-      console.error(`⛔ Chyba při zpracování školky ${schoolName}:`, err.message);
+      console.error(`⛔ Chyba při zpracování: ${schoolName} – ${date}`, err.message);
     }
   }
 
