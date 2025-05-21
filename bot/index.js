@@ -1,3 +1,4 @@
+// bot/index.js (Puppeteer skript pro víc školek)
 const puppeteer = require('puppeteer');
 const fs = require('fs');
 const path = require('path');
@@ -6,99 +7,67 @@ const dayjs = require('dayjs');
 (async () => {
   const email = process.env.TWIGSEE_EMAIL;
   const password = process.env.TWIGSEE_PASSWORD;
-  const schoolName = process.env.SCHOOL_NAME;
   const downloadPath = path.resolve(__dirname, 'downloads');
-  const today = dayjs().format('DD.MM.YYYY');
+  const date = dayjs().subtract(1, 'day').format('DD.MM.YYYY');
+  const dateLabel = dayjs().subtract(1, 'day').format('YYYY-MM-DD');
 
   if (!fs.existsSync(downloadPath)) fs.mkdirSync(downloadPath);
 
-  console.log("Spouštím prohlížeč...");
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: ['--no-sandbox'],
-    defaultViewport: null,
-  });
-
+  const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox'] });
   const page = await browser.newPage();
 
-  // 🧩 Nastavení složky pro stahování (zatím ponecháme, pro budoucnost)
-  const client = await page.target().createCDPSession();
-  await client.send('Page.setDownloadBehavior', {
-    behavior: 'allow',
-    downloadPath: downloadPath,
-  });
-
-  console.log("Otevírám přihlašovací stránku...");
+  console.log("Logging in...");
   await page.goto('https://admin.twigsee.com');
-  await new Promise(resolve => setTimeout(resolve, 1000));
-
-  console.log("Vyplňuji přihlašovací údaje...");
   await page.type('input[name="email"]', email);
   await page.type('input[name="password"]', password);
-
-  console.log("Čekám na tlačítko Přihlásit...");
-  await page.waitForSelector('input[type="submit"]');
-  console.log("Klikám na tlačítko Přihlásit...");
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'networkidle0' }),
     page.click('input[type="submit"]')
   ]);
-  console.log("Přihlášení proběhlo.");
 
-  await new Promise(resolve => setTimeout(resolve, 1000));
   await page.goto('https://admin.twigsee.com/user-admin/choice-school');
-
-  console.log("Vyhledávám výběr školky...");
   await page.waitForSelector('.select2-selection');
   await page.click('.select2-selection');
-
-  console.log("Čekám na otevření dropdownu...");
   await page.waitForSelector('.select2-results__option');
 
-  console.log("Hledám školku v seznamu...");
   const options = await page.$$('.select2-results__option');
+  const schoolNames = [];
   for (const option of options) {
     const text = await option.evaluate(el => el.textContent.trim());
-    if (text.includes(schoolName)) {
-      console.log(`Klikám na: ${text}`);
-      await option.click();
-      break;
-    }
+    if (text && text !== 'Vyberte') schoolNames.push(text);
   }
 
-  console.log("Školka vybrána.");
-  console.log(`Vybral jsem školku: ${schoolName}`);
+  for (const schoolName of schoolNames) {
+    console.log(`Zpracovávám školku: ${schoolName}`);
 
-  await page.waitForNavigation({ waitUntil: 'networkidle0' });
-  console.log("Přepínám na stránku s docházkou...");
-  await page.goto('https://admin.twigsee.com/child-attendance/list');
-  await new Promise(resolve => setTimeout(resolve, 2000));
+    // otevři dropdown znovu
+    await page.click('.select2-selection');
+    await page.waitForSelector('.select2-results__option');
+    const options = await page.$$('.select2-results__option');
+    for (const option of options) {
+      const text = await option.evaluate(el => el.textContent.trim());
+      if (text === schoolName) {
+        await option.click();
+        break;
+      }
+    }
 
-  // 📸 Screenshot pro ladění
-  await page.screenshot({ path: 'export-screen.png' });
+    await page.waitForNavigation({ waitUntil: 'networkidle0' });
+    await page.goto('https://admin.twigsee.com/child-attendance/list');
+    await page.waitForSelector('a.btn-export');
+    const href = await page.$eval('a.btn-export', el => el.getAttribute('href'));
+    const exportUrl = `https://admin.twigsee.com${href}?chiatt__date=${date}`;
 
-  console.log("Hledám odkaz ke stažení exportu...");
-  await page.waitForSelector('a.btn-export');
+    const buffer = await page.evaluate(async (url) => {
+      const res = await fetch(url, { credentials: 'include' });
+      const arrayBuffer = await res.arrayBuffer();
+      return Array.from(new Uint8Array(arrayBuffer));
+    }, exportUrl);
 
-  const exportHref = await page.$eval('a.btn-export', el => el.getAttribute('href'));
-  const exportUrl = `https://admin.twigsee.com${exportHref}`;
-  console.log(`Načten export URL: ${exportUrl}`);
-
-  const filePath = path.join(downloadPath, `dochazka_${today}.xls`);
-  console.log(`Stahuji soubor pomocí fetch z URL: ${exportUrl}...`);
-
-  const buffer = await page.evaluate(async (url) => {
-    const res = await fetch(url, { credentials: 'include' });
-    if (!res.ok) throw new Error(`Fetch selhal: ${res.statusText}`);
-    const arrayBuffer = await res.arrayBuffer();
-    return Array.from(new Uint8Array(arrayBuffer));
-  }, exportUrl);
-
-  fs.writeFileSync(filePath, Buffer.from(buffer));
-  console.log(`Soubor uložen: ${filePath}`);
-
-  await page.screenshot({ path: 'after-export-click.png' });
+    const fileName = `dochazka_${dateLabel}_${schoolName.replace(/\s+/g, '_')}.xls`;
+    fs.writeFileSync(path.join(downloadPath, fileName), Buffer.from(buffer));
+    console.log(`✔ Staženo: ${fileName}`);
+  }
 
   await browser.close();
-  console.log("Hotovo. Prohlížeč zavřen.");
 })();
