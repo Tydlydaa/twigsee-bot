@@ -37,8 +37,8 @@ const dayjs = require('dayjs');
 
   console.log("Otevírám přihlašovací stránku...");
   await page.goto('https://admin.twigsee.com');
-  await page.waitForTimeout(1000);
-
+  await new Promise(resolve => setTimeout(resolve, 1000));
+  
   console.log("Vyplňuji přihlašovací údaje...");
   await page.type('input[name="email"]', email);
   await page.type('input[name="password"]', password);
@@ -82,8 +82,8 @@ const dayjs = require('dayjs');
 
     await page.waitForNavigation({ waitUntil: 'networkidle0' });
     await page.goto('https://admin.twigsee.com/child-attendance/list');
-    await page.waitForTimeout(2000);
-
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
     const href = await page.$eval('a.btn-export', el => el.getAttribute('href'));
     const exportUrl = `https://admin.twigsee.com${href}`;
     const filePath = path.join(downloadPath, `dochazka_${fileDate}_${fullName.replace(/\s+/g, '_')}.xls`);
