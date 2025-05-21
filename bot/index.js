@@ -76,9 +76,9 @@ const dayjs = require('dayjs');
   const downloadTarget = path.join(downloadPath, `dochazka_${today}.xls`);
 
   console.log(`Stahuji exportovaný soubor z: ${exportUrl}`);
-  const downloadPage = await browser.newPage();
-  const viewSource = await downloadPage.goto(exportUrl);
-  fs.writeFileSync(downloadTarget, await viewSource.buffer());
+ console.log("Stahuji exportovaný soubor (přes aktuální relaci)...");
+const viewSource = await page.goto(exportUrl);
+fs.writeFileSync(downloadTarget, await viewSource.buffer());
 
   console.log(`Soubor uložen: ${downloadTarget}`);
 
