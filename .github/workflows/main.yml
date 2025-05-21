@@ -1,8 +1,8 @@
-name: Daily Twigsee Export 
- 
+name: Daily Twigsee Export
+
 on:
   schedule:
-    - cron: '0 6 * * *'  # Runs every day at 6:00 UTC
+    - cron: '0 6 * * *'  # Spouští každý den v 6:00 UTC (8:00 Praha)
   workflow_dispatch:
 
 jobs:
@@ -27,6 +27,7 @@ jobs:
         TWIGSEE_EMAIL: ${{ secrets.TWIGSEE_EMAIL }}
         TWIGSEE_PASSWORD: ${{ secrets.TWIGSEE_PASSWORD }}
         SCHOOL_NAME: ${{ secrets.SCHOOL_NAME }}
+        GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
 
     - name: Upload to Google Sheets
       run: node sheets/upload.js
