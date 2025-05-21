@@ -85,7 +85,7 @@ await new Promise(resolve => setTimeout(resolve, 3000));
 await page.screenshot({ path: 'after-export-click.png' });
 console.log("Kliknutí na Export provedeno, čekal jsem 3 sekundy.");
 
-  console.log(`Soubor exportován: ${path.join(downloadPath, downloadedFile)}`);
+ // console.log(`Soubor exportován: ${path.join(downloadPath, downloadedFile)}`);
 
   await browser.close();
   console.log("Hotovo. Prohlížeč zavřen.");
