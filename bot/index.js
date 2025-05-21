@@ -16,6 +16,9 @@ const dayjs = require('dayjs');
     fs.mkdirSync(downloadPath, { recursive: true });
   }
 
+  const date = dayjs().subtract(1, 'day').format('DD.MM.YYYY');
+  const dateLabel = dayjs().subtract(1, 'day').format('YYYY-MM-DD');
+
   const browser = await puppeteer.launch({
     headless: true,
     args: ['--no-sandbox'],
@@ -47,24 +50,21 @@ const dayjs = require('dayjs');
   ]);
   console.log("Přihlášení proběhlo.");
 
-  const testSchool = "Dětská skupina Školička Keltičkova";
+  await page.goto('https://admin.twigsee.com/user-admin/choice-school');
+  await page.waitForSelector('.select2-selection');
+  await page.click('.select2-selection');
+  await page.waitForSelector('.select2-results__option');
 
-  // 🗓️ Vygeneruj pracovní dny v květnu 2025
-  const testDates = [];
-  for (let d = dayjs('2025-05-01'); d.isBefore('2025-06-01'); d = d.add(1, 'day')) {
-    const day = d.day(); // 0 = neděle, 6 = sobota
-    if (day !== 0 && day !== 6) {
-      testDates.push(d);
-    }
-  }
+  const schoolNames = await page.$$eval('.select2-results__option', options =>
+    options
+      .map(opt => opt.textContent.trim())
+      .filter(name => name && !/^vyberte|choose$/i.test(name))
+  );
 
-  for (const targetDate of testDates) {
-    const date = targetDate.format('DD.MM.YYYY');
-    const dateLabel = targetDate.format('YYYY-MM-DD');
-    const schoolName = testSchool;
+  console.log("Zjištěné školky:", schoolNames);
 
-    console.log(`Zpracovávám školku: ${schoolName} pro datum: ${date}`);
-
+  for (const schoolName of schoolNames) {
+    console.log(`Zpracovávám školku: ${schoolName}`);
     try {
       await page.goto('https://admin.twigsee.com/user-admin/choice-school');
       await page.waitForSelector('.select2-selection');
@@ -97,7 +97,7 @@ const dayjs = require('dayjs');
       fs.writeFileSync(path.join(downloadPath, fileName), Buffer.from(buffer));
       console.log(`✔ Staženo: ${fileName}`);
     } catch (err) {
-      console.error(`⛔ Chyba při zpracování: ${schoolName} – ${date}`, err.message);
+      console.error(`⛔ Chyba při zpracování školky ${schoolName}:`, err.message);
     }
   }
 
